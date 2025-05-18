@@ -67,10 +67,10 @@ function init() {
             // console.log("data loaded: ");
             // console.log(reader.result);
             const data = d3.csvParse(reader.result);
-            console.log(data);
-            // // TODO: parse reader.result data and call the init functions with the parsed data!
+            // TODO: parse reader.result data and call the init functions with the parsed data!
+            // DONE
             initVis(data);
-            CreateDataTable([data.columns, data]);
+            CreateDataTable( data);
             // TODO: possible place to call the dashboard file for Part 2
             initDashboard(null);
         };
@@ -85,7 +85,14 @@ function init() {
 function initVis(_data){
 
     // TODO: parse dimensions (i.e., attributes) from input file
-
+    // DONE
+    dimensions = _data.columns.slice(1);
+    let domain = dimensions.map((dimension) => {
+        return _data.slice(1).reduce((acc, val) => Math.max(acc, val[dimension]), 0);
+    })
+    console.log(dimensions);
+    console.log(domain);
+    
     // y scalings for scatterplot
     // TODO: set y domain for each dimension
     let y = d3.scaleLinear()
@@ -148,6 +155,7 @@ function initVis(_data){
     // TODO: render grid lines in gray
 
     // TODO: render correct axes labels
+    // DONE
     radar.selectAll(".axisLabel")
         .data(dimensions)
         .enter()
@@ -156,7 +164,9 @@ function initVis(_data){
         .attr("dy", "0.35em")
         .attr("x", function(d, i){ return radarX(axisRadius(textRadius), i); })
         .attr("y", function(d, i){ return radarY(axisRadius(textRadius), i); })
-        .text("dimension");
+        // .text("dimension")
+        .text(dimension => dimension);
+        
 
     // init menu for the visual channels
     channels.forEach(function(c){
@@ -183,13 +193,14 @@ function clear(){
 function CreateDataTable(_data) {
 
     // TODO: create table and add class
-    const tableDiv = document.getElementById("dataTable");
+    // DONE
     let table = document.createElement("table");
 
     // TODO: add headers, row & columns
+    // DONE
     table.classList.add("dataTableClass");
     let row = document.createElement("tr");
-    _data[0].forEach(element => {
+    _data.columns.forEach(element => {
         let cell = document.createElement("th");
         cell.classList.add("tableHeaderClass");
         cell.innerText = element;
@@ -198,10 +209,10 @@ function CreateDataTable(_data) {
     });
 
     table.append(row);
-    _data[1].forEach(element => {
+    _data.slice(1).forEach(element => {
         row = document.createElement("tr");
-        _data[0].forEach(attr => {
-            let cell = document.createElement("th");
+        _data.columns.forEach(attr => {
+            let cell = document.createElement("td");
             cell.classList.add("tableBodyClass");
             cell.innerText = element[attr];
             cell.onmouseover = addColorOnHover;
@@ -210,9 +221,10 @@ function CreateDataTable(_data) {
         })
         table.append(row);
     });
-    tableDiv.append(table);
+    dataTable.node().append(table);
 
     // TODO: add mouseover event
+    // DONE
     function addColorOnHover(e) {
         e.target.classList.add("blueBg")
     }
