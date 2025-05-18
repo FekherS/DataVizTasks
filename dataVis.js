@@ -56,7 +56,8 @@ function init() {
         .attr("transform", "translate(" + (width / 2) + "," + (height / 2) + ")");
 
     // read and parse input file
-    let fileInput = document.getElementById("upload"), readFile = function () {
+    let fileInput = document.getElementById("upload");
+    let readFile = function () {
 
         // clear existing visualizations
         clear();
@@ -65,18 +66,18 @@ function init() {
         reader.onloadend = function () {
             // console.log("data loaded: ");
             // console.log(reader.result);
-
-            // TODO: parse reader.result data and call the init functions with the parsed data!
-            initVis(null);
-            CreateDataTable(null);
+            const data = d3.csvParse(reader.result);
+            console.log(data);
+            // // TODO: parse reader.result data and call the init functions with the parsed data!
+            initVis(data);
+            CreateDataTable([data.columns, data]);
             // TODO: possible place to call the dashboard file for Part 2
             initDashboard(null);
         };
         reader.readAsBinaryString(fileInput.files[0]);
     };
     fileInput.addEventListener('change', readFile);
-    console.log(fileInput);
-    console.dir(fileInput);
+
 
 }
 
@@ -84,7 +85,6 @@ function init() {
 function initVis(_data){
 
     // TODO: parse dimensions (i.e., attributes) from input file
-
 
     // y scalings for scatterplot
     // TODO: set y domain for each dimension
@@ -183,11 +183,43 @@ function clear(){
 function CreateDataTable(_data) {
 
     // TODO: create table and add class
+    const tableDiv = document.getElementById("dataTable");
+    let table = document.createElement("table");
 
     // TODO: add headers, row & columns
+    table.classList.add("dataTableClass");
+    let row = document.createElement("tr");
+    _data[0].forEach(element => {
+        let cell = document.createElement("th");
+        cell.classList.add("tableHeaderClass");
+        cell.innerText = element;
+        row.append(cell);
+
+    });
+
+    table.append(row);
+    _data[1].forEach(element => {
+        row = document.createElement("tr");
+        _data[0].forEach(attr => {
+            let cell = document.createElement("th");
+            cell.classList.add("tableBodyClass");
+            cell.innerText = element[attr];
+            cell.onmouseover = addColorOnHover;
+            cell.onmouseout = removeColorOnStopHover;
+            row.append(cell);
+        })
+        table.append(row);
+    });
+    tableDiv.append(table);
 
     // TODO: add mouseover event
+    function addColorOnHover(e) {
+        e.target.classList.add("blueBg")
+    }
+    function removeColorOnStopHover(e){
+        e.target.classList.remove("blueBg")
 
+    };
 }
 function renderScatterplot(){
 
