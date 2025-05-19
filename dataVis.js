@@ -8,7 +8,7 @@
 *
 * All rights reserved.
 */
-
+let bound, x = {}, y = {}, r = {};
 // scatterplot axes
 let xAxis, yAxis, xAxisLabel, yAxisLabel;
 // radar chart axes
@@ -87,13 +87,13 @@ function initVis(_data){
   // DONE
   dimensions = _data.columns.slice(1);
   let domain = dimensions.map((dimension) =>
-    d3.max(_data, (d) => d[dimension])
+    d3.max(_data, (d) => Number(d[dimension]))
   );
-
+    console.log(domain);
   // y scalings for scatterplot
   // TODO: set y domain for each dimension
   //DONE
-  let y = {};
+  y = {};
   for (let i = 0; i < dimensions.length; ++i) {
     y[dimensions[i]] = d3
       .scaleLinear()
@@ -107,7 +107,7 @@ function initVis(_data){
   // TODO: set x domain for each dimension
   //DONE
 
-  let x = {};
+  x = {};
   for (let i = 0; i < dimensions.length; ++i) {
     x[dimensions[i]] = d3
       .scaleLinear()
@@ -120,12 +120,12 @@ function initVis(_data){
   // radius scalings for radar chart
   // TODO: set radius domain for each dimension
   //DONE
-  let r = {};
+  r = {};
   for (let i = 0; i < dimensions.length; ++i) {
     r[dimensions[i]] = d3
       .scaleLinear()
       .domain([0, domain[i]])
-      .range([0, radius]);
+      .range([0, 15]);
   }
   // let r = d3.scaleLinear()
   //     .range([0, radius]);
@@ -253,9 +253,11 @@ function initVis(_data){
   channels.forEach(function (c) {
     refreshMenu(c);
   });
-  scatter.selectAll('circle').data(_data);
-  renderScatterplot();
-  renderRadarChart();
+    
+    
+   bound = scatter.selectAll("circle").data(_data); 
+    renderScatterplot();
+    renderRadarChart();
 }
 
 // clear visualizations before loading a new file
@@ -310,25 +312,31 @@ function CreateDataTable(_data) {
     };
 }
 function renderScatterplot(){
-  // TODO: get domain names from menu and label x- and y-axis
-  //DONE
+    // TODO: get domain names from menu and label x- and y-axis
+    //DONE
+    let ax = readMenu(channels[0]);
+    let ay = readMenu(channels[1]);
+    let ar = readMenu(channels[2]);
+    let ix = dimensions.indexOf(ax);
+    let iy = dimensions.indexOf(ay);
+    let ir = dimensions.indexOf(ar);
 
-  let ax = readMenu(channels[0]);
-  let ay = readMenu(channels[1]);
-  let ar = readMenu(channels[2]);
-  let ix = dimensions.indexOf(ax);
-  let iy = dimensions.indexOf(ay);
-  let ir = dimensions.indexOf(ar);
+    // TODO: re-render axes
+    //DONE
+    scatter.selectAll(".x").classed("hidden", true);
+    scatter.selectAll(".x._" + ix).classed("hidden", false);
+    scatter.selectAll(".y").classed("hidden", true);
+    scatter.selectAll(".y._" + iy).classed("hidden", false);
 
-  // TODO: re-render axes
-  //DONE
-
-  scatter.selectAll(".x").classed("hidden", true);
-  scatter.selectAll(".x._" + ix).classed("hidden", false);
-  scatter.selectAll(".y").classed("hidden", true);
-  scatter.selectAll(".y._" + iy).classed("hidden", false);
-
-  // TODO: render dots
+    // TODO: render dots
+    scatter.selectAll("circle").remove();
+    bound.join("circle")
+        .attr("cx", d => x[ax](d[ax]))
+        .attr("cy", d => y[ay](d[ay]))
+        .attr("r", d => r[ar](d[ar]))
+        .attr("fill", "yellow")
+        .attr("stroke", "black")           
+        .attr("stroke-width", 1);  
 }
 
 function renderRadarChart(){
