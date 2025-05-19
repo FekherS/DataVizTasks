@@ -126,6 +126,7 @@ fieldset {
     width: 10px;
     height: 10px;
     border-radius: 50%;
+    border:solid #000 1px;
 }
 
 /* the style for dots in the scatterplot */

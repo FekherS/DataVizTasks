@@ -12,7 +12,10 @@
 //added variables
 let data = null;
 let domain = null;
-
+let selectedData = [];
+let selectColor = [];
+let legend;
+let freeColor =[ "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#bcbd22", "#17becf" ];
 // scatterplot axes
 let xAxis, yAxis, xAxisLabel, yAxisLabel;
 // radar chart axes
@@ -57,7 +60,9 @@ function init() {
         .attr("height", height)
         .append("g")
         .attr("transform", "translate(" + (width / 2) + "," + (height / 2) + ")");
-
+      
+    legend = d3.select("#legend");
+  
     // read and parse input file
     let fileInput = document.getElementById("upload"), readFile = function () {
 
@@ -66,8 +71,6 @@ function init() {
 
         let reader = new FileReader();
         reader.onloadend = function () {
-            console.log("data loaded: ");
-            console.log(reader.result);
             data = d3.csvParse(reader.result)
             // TODO: parse reader.result data and call the init functions with the parsed data!
             initVis();
@@ -259,22 +262,92 @@ function renderScatterplot(){
     xAxis.call(d3.axisBottom(x))
     yAxis.call(d3.axisLeft(y));
     // TODO: render dots
-    scatter.selectAll("circle").remove();
     scatter.selectAll("circle").data(data)
         .join("circle")
         .attr("cx", d => x(d[ax]))
         .attr("cy", d => y(d[ay]))
         .attr("r", d => r(d[ar]))
-        .attr("fill", "black")
-        .attr("fill-opacity", 0.5)           
-        .attr("stroke-width", 1); 
+        .attr("fill", (d) => {
+            let found =  selectedData.find((item) => item[0] === d); 
+            return found ? found[1] : "black";
+        })
+        .attr("fill-opacity", (d) => {
+            let found =  selectedData.find((item) => item[0] === d); 
+            return found ? 1 : 0.2;
+        })           
+        .attr("stroke-width", 1)
+        .attr("class", "dot")
+      .on("click", function (event, d) {
+            let found =  selectedData.find((item) => item[0] === d); 
+            if (freeColor.length && !found) {
+                let color = freeColor.pop();
+                selectedData.push([d, color]);
+                d3.select(this).attr("fill", color).attr("fill-opacity", 1);
+                renderRadarChart();
+              }
+      })
+
 }
 
 function renderRadarChart(){
+    let label = data.columns[0];
+    legend.selectAll("div").remove();
 
     // TODO: show selected items in legend
-
+    selectedData.forEach(item => {
+        let wrapper = legend.append("div").style("display", "flex")
+          .style("align-items", "center")
+          .style("gap", "20px")
+          .style("height", "22px");
+        wrapper.append("div").attr("class", "color-circle").style("background-color", item[1]);
+        wrapper.append("p").text(item[0][label]);
+        wrapper.append("button").attr("class", "close").text("X").on("click", foo)
+    })
+    function foo(e) {
+      let parent = e.target.parentElement;
+      let color = getComputedStyle(parent.children[0]).backgroundColor;
+      parent.remove();
+      let index = selectedData.findIndex((item) => {
+        return hexToRgb(item[1]) === color && freeColor.push(item[1]);
+      });
+      if (index !== -1) {
+        selectedData.splice(index, 1); // modifies selectedData in place
+      }
+        renderScatterplot();
+        renderRadarChart();
+    }
+    console.log(radius);
     // TODO: render polylines in a unique color
+    radar.selectAll("polyline").data(selectedData)
+        .join("polyline")
+        .attr("points", (d) => {
+            let a = dimensions.map((val, index) => {
+                let axisRadius = d3.scaleLinear()
+                    .domain([domain[index][0], domain[index][1]])
+                    .range([0, radius]);
+                return [radarX(axisRadius(d[0][val]) * 0.75, index), radarY(axisRadius(d[0][val]) * 0.75, index)];
+            })
+            return a.reduce((acc, val) => acc + val[0] + ',' + val[1] + ' ', "") + " " + a[0][0] + ',' + a[0][1];
+        })
+        .attr("stroke", d => d[1])
+        .attr("fill-opacity", 0)
+        .attr("stroke-width", 3);  
+    
+    
+    dimensions.forEach((val, i) => {
+        let axisRadius = d3.scaleLinear()
+            .domain([domain[i][0], domain[i][1]])
+            .range([0, radius]);
+        
+        radar.selectAll(".circle-" + i)
+            .data(selectedData)
+            .join("circle")
+            .attr("cx", d => radarX(axisRadius(d[0][val]) * 0.75, i))
+            .attr("cy", d => radarY(axisRadius(d[0][val]) * 0.75, i))
+            .attr("r", 5)
+            .attr("fill", d => d[1])
+            .attr("class", "circle-" + i);
+    })
 }
 
 
@@ -328,4 +401,17 @@ function openPage(pageName,elmnt,color) {
     }
     document.getElementById(pageName).style.display = "block";
     elmnt.style.backgroundColor = color;
+}
+
+
+//util
+function hexToRgb(hex) {
+  hex = hex.replace("#", "");
+  if (hex.length === 3) {
+      hex = hex.split("").map(c => c + c).join("");
+  }
+  let r = parseInt(hex.substring(0, 2), 16);
+  let g = parseInt(hex.substring(2, 4), 16);
+  let b = parseInt(hex.substring(4, 6), 16);
+  return `rgb(${r}, ${g}, ${b})`;
 }
