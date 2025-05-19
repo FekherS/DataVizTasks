@@ -70,7 +70,7 @@ function init() {
             // TODO: parse reader.result data and call the init functions with the parsed data!
             // DONE
             initVis(data);
-            CreateDataTable( data);
+            CreateDataTable(data);
             // TODO: possible place to call the dashboard file for Part 2
             initDashboard(null);
         };
@@ -83,103 +83,179 @@ function init() {
 
 
 function initVis(_data){
+  // TODO: parse dimensions (i.e., attributes) from input file
+  // DONE
+  dimensions = _data.columns.slice(1);
+  let domain = dimensions.map((dimension) =>
+    d3.max(_data, (d) => d[dimension])
+  );
 
-    // TODO: parse dimensions (i.e., attributes) from input file
-    // DONE
-    dimensions = _data.columns.slice(1);
-    let domain = dimensions.map((dimension) => {
-        return _data.slice(1).reduce((acc, val) => Math.max(acc, val[dimension]), 0);
+  // y scalings for scatterplot
+  // TODO: set y domain for each dimension
+  //DONE
+  let y = {};
+  for (let i = 0; i < dimensions.length; ++i) {
+    y[dimensions[i]] = d3
+      .scaleLinear()
+      .domain([0, domain[i]])
+      .range([height - margin.bottom - margin.top, margin.top]);
+  }
+  // let y = d3.scaleLinear()
+  //     .range([height - margin.bottom - margin.top, margin.top]);
+
+  // x scalings for scatter plot
+  // TODO: set x domain for each dimension
+  //DONE
+
+  let x = {};
+  for (let i = 0; i < dimensions.length; ++i) {
+    x[dimensions[i]] = d3
+      .scaleLinear()
+      .domain([0, domain[i]])
+      .range([margin.left, width - margin.left - margin.right]);
+  }
+  // let x = d3.scaleLinear()
+  //     .range([margin.left, width - margin.left - margin.right]);
+
+  // radius scalings for radar chart
+  // TODO: set radius domain for each dimension
+  //DONE
+  let r = {};
+  for (let i = 0; i < dimensions.length; ++i) {
+    r[dimensions[i]] = d3
+      .scaleLinear()
+      .domain([0, domain[i]])
+      .range([0, radius]);
+  }
+  // let r = d3.scaleLinear()
+  //     .range([0, radius]);
+
+  // scatterplot axes
+
+  yAxis = {};
+  for (let i = 0; i < dimensions.length; ++i) {
+    yAxis[dimensions[i]] = scatter
+      .append("g")
+      .attr("class", "y axis hidden _" + i)
+      .attr("transform", "translate(" + margin.left + ")")
+      .call(d3.axisLeft(y[dimensions[i]]));
+    yAxisLabel = yAxis[dimensions[i]]
+      .append("text")
+      .style("text-anchor", "middle")
+      .attr("class", "y hidden _" + i)
+      .attr("y", margin.top / 2)
+      .text(dimensions[i]);
+  }
+  // yAxis = scatter.append("g")
+  //     .attr("class", "axis")
+  //     .attr("transform", "translate(" + margin.left + ")")
+  //     .call(d3.axisLeft(y));
+
+  // yAxisLabel = yAxis.append("text")
+  //     .style("text-anchor", "middle")
+  //     .attr("y", margin.top / 2)
+  //     .text("x");
+
+  xAxis = {};
+  for (let i = 0; i < dimensions.length; ++i) {
+    xAxis[dimensions[i]] = scatter
+      .append("g")
+      .attr("class", "x axis hidden _" + i)
+      .attr(
+        "transform",
+        "translate(0, " + (height - margin.bottom - margin.top) + ")"
+      )
+      .call(d3.axisBottom(x[dimensions[i]]));
+    xAxisLabel = xAxis[dimensions[i]]
+      .append("text")
+      .style("text-anchor", "middle")
+      .attr("class", "x hidden _" + i)
+      .attr("x", width - margin.right)
+      .text(dimensions[i]);
+  }
+  // xAxis = scatter.append("g")
+  //     .attr("class", "axis")
+  //     .attr("transform", "translate(0, " + (height - margin.bottom - margin.top) + ")")
+  //     .call(d3.axisBottom(x));
+  // xAxisLabel = xAxis.append("text")
+  //     .style("text-anchor", "middle")
+  //     .attr("x", width - margin.right)
+  //     .text("y");
+
+  // radar chart axes
+  radarAxesAngle = (Math.PI * 2) / dimensions.length;
+  let axisRadius = d3.scaleLinear().range([0, radius]);
+  let maxAxisRadius = 0.75,
+    textRadius = 0.8;
+  gridRadius = 0.1;
+
+  // radar axes
+  radarAxes = radar
+    .selectAll(".axis")
+    .data(dimensions)
+    .enter()
+    .append("g")
+    .attr("class", "axis");
+
+  radarAxes
+    .append("line")
+    .attr("x1", 0)
+    .attr("y1", 0)
+    .attr("x2", function (d, i) {
+      return radarX(axisRadius(maxAxisRadius), i);
     })
-    console.log(dimensions);
-    console.log(domain);
-    
-    // y scalings for scatterplot
-    // TODO: set y domain for each dimension
-    let y = d3.scaleLinear()
-        .range([height - margin.bottom - margin.top, margin.top]);
+    .attr("y2", function (d, i) {
+      return radarY(axisRadius(maxAxisRadius), i);
+    })
+    .attr("class", "line")
+    .style("stroke", "black");
 
-    // x scalings for scatter plot
-    // TODO: set x domain for each dimension
-    let x = d3.scaleLinear()
-        .range([margin.left, width - margin.left - margin.right]);
-
-    // radius scalings for radar chart
-    // TODO: set radius domain for each dimension
-    let r = d3.scaleLinear()
-        .range([0, radius]);
-
-    // scatterplot axes
-    yAxis = scatter.append("g")
-        .attr("class", "axis")
-        .attr("transform", "translate(" + margin.left + ")")
-        .call(d3.axisLeft(y));
-
-    yAxisLabel = yAxis.append("text")
-        .style("text-anchor", "middle")
-        .attr("y", margin.top / 2)
-        .text("x");
-
-    xAxis = scatter.append("g")
-        .attr("class", "axis")
-        .attr("transform", "translate(0, " + (height - margin.bottom - margin.top) + ")")
-        .call(d3.axisBottom(x));
-
-    xAxisLabel = xAxis.append("text")
-        .style("text-anchor", "middle")
-        .attr("x", width - margin.right)
-        .text("y");
-
-    // radar chart axes
-    radarAxesAngle = Math.PI * 2 / dimensions.length;
-    let axisRadius = d3.scaleLinear()
-        .range([0, radius]);
-    let maxAxisRadius = 0.75,
-        textRadius = 0.8;
-    gridRadius = 0.1;
-
-    // radar axes
-    radarAxes = radar.selectAll(".axis")
+    // TODO: render grid lines in gray
+    // DONE
+    let greylines = radar.selectAll(".greyline")
         .data(dimensions)
         .enter()
         .append("g")
-        .attr("class", "axis");
+        .attr("class", "greyline")
+    for (let j = 1; j <= 6; ++j){
+        greylines.append("line")
+        .attr("x1", function (d, i) {return radarX(axisRadius(maxAxisRadius * j / 7), i);})
+        .attr("y1", function (d, i) {return radarY(axisRadius(maxAxisRadius * j / 7), i);})
+        .attr("x2", function (d, i) {return radarX(axisRadius(maxAxisRadius * j / 7), i + 1);})
+        .attr("y2", function (d, i) {return radarY(axisRadius(maxAxisRadius * j / 7), i + 1);})
+        .attr("class", "greyline")
+        .style("stroke", "grey");
+    }
+  // TODO: render correct axes labels
+  // DONE
+  radar
+    .selectAll(".axisLabel")
+    .data(dimensions)
+    .enter()
+    .append("text")
+    .attr("text-anchor", "middle")
+    .attr("dy", "0.35em")
+    .attr("x", function (d, i) {
+      return radarX(axisRadius(textRadius), i);
+    })
+    .attr("y", function (d, i) {
+      return radarY(axisRadius(textRadius), i);
+    })
+    // .text("dimension")
+    .text((dimension) => dimension);
 
-    radarAxes.append("line")
-        .attr("x1", 0)
-        .attr("y1", 0)
-        .attr("x2", function(d, i){ return radarX(axisRadius(maxAxisRadius), i); })
-        .attr("y2", function(d, i){ return radarY(axisRadius(maxAxisRadius), i); })
-        .attr("class", "line")
-        .style("stroke", "black");
+  // init menu for the visual channels
+  channels.forEach(function (c) {
+    initMenu(c, dimensions);
+  });
 
-    // TODO: render grid lines in gray
-
-    // TODO: render correct axes labels
-    // DONE
-    radar.selectAll(".axisLabel")
-        .data(dimensions)
-        .enter()
-        .append("text")
-        .attr("text-anchor", "middle")
-        .attr("dy", "0.35em")
-        .attr("x", function(d, i){ return radarX(axisRadius(textRadius), i); })
-        .attr("y", function(d, i){ return radarY(axisRadius(textRadius), i); })
-        // .text("dimension")
-        .text(dimension => dimension);
-        
-
-    // init menu for the visual channels
-    channels.forEach(function(c){
-        initMenu(c, dimensions);
-    });
-
-    // refresh all select menus
-    channels.forEach(function(c){
-        refreshMenu(c);
-    });
-
-    renderScatterplot();
-    renderRadarChart();
+  // refresh all select menus
+  channels.forEach(function (c) {
+    refreshMenu(c);
+  });
+  scatter.selectAll('circle').data(_data);
+  renderScatterplot();
+  renderRadarChart();
 }
 
 // clear visualizations before loading a new file
@@ -234,12 +310,25 @@ function CreateDataTable(_data) {
     };
 }
 function renderScatterplot(){
+  // TODO: get domain names from menu and label x- and y-axis
+  //DONE
 
-    // TODO: get domain names from menu and label x- and y-axis
+  let ax = readMenu(channels[0]);
+  let ay = readMenu(channels[1]);
+  let ar = readMenu(channels[2]);
+  let ix = dimensions.indexOf(ax);
+  let iy = dimensions.indexOf(ay);
+  let ir = dimensions.indexOf(ar);
 
-    // TODO: re-render axes
+  // TODO: re-render axes
+  //DONE
 
-    // TODO: render dots
+  scatter.selectAll(".x").classed("hidden", true);
+  scatter.selectAll(".x._" + ix).classed("hidden", false);
+  scatter.selectAll(".y").classed("hidden", true);
+  scatter.selectAll(".y._" + iy).classed("hidden", false);
+
+  // TODO: render dots
 }
 
 function renderRadarChart(){

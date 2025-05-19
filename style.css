@@ -151,3 +151,7 @@ div.tooltip {
 .blueBg{
     background-color: #B0E0E6;
 }
+
+.hidden{
+    display:none;
+}
