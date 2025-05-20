@@ -271,7 +271,7 @@ function renderRadarChart() {
     
     legendItem.exit().remove();
 
-    let enterItems = legendItem.enter()
+    legendItem = legendItem.enter()
         .append("div")
         .attr("class", "legend-item")
         .style("display", "flex")
@@ -279,26 +279,57 @@ function renderRadarChart() {
         .style("gap", "20px")
         .style("height", "22px");
     
-    enterItems.append("button").attr("class", "close").text("X").on("click", foo)
-    enterItems.append("div")
+    legendItem.append("button").attr("class", "close").text("X").on("click", handleRemovalRadar)
+    legendItem.append("div")
     .style("background-color", d => d[1])
     .attr("class","color-circle");
-    enterItems.append("p").text(d=>d[0][label]);
+    legendItem.append("p").text(d=>d[0][label]);
 
-    function foo(e, d) {
-        console.log(d);
-        console.log(radarData);
-        radarData = radarData.filter(ele => ele[1] !== d[1]);
-        console.log(radarData);
-
-        colors.push(d[1]);
-        scatter.select(".nodes").selectAll("circle")
-            .filter(sd => sd === d[0])
-            .attr("fill", "black")
-            .attr("fill-opacity", 0.2);
-        renderRadarChart();
-    }
     // TODO: render polylines in a unique color
+    let radarItem = radar.selectAll(".radar-item")
+        .data(radarData, d => d[1]);
+    
+    radarItem.exit().remove();
+
+    radarItem = radarItem.enter()
+        .append("g")
+        .attr("class", "radar-item");
+    
+    radarItem.append("polyline").attr("points", (d) => {
+        let a = dimensions.map((val, index) => {
+            let axisRadius = d3.scaleLinear()
+                .domain([domain[val][0], domain[val][1]])
+                .range([0, radius]);
+            return [radarX(axisRadius(d[0][val]) * 0.75, index), radarY(axisRadius(d[0][val]) * 0.75, index)];
+        })
+        return a.reduce((acc, val) => acc + val[0] + ',' + val[1] + ' ', "") + " " + a[0][0] + ',' + a[0][1];
+        }).attr("stroke", d => d[1])
+        .attr("fill-opacity", 0)
+        .attr("stroke-width", 3);  
+    
+    dimensions.forEach((val, index) => {
+        let axisRadius = d3.scaleLinear()
+            .domain([domain[val][0], domain[val][1]])
+            .range([0, radius]);
+        radarItem.append("circle")
+            .attr("cx", d => radarX(axisRadius(d[0][val]) * 0.75, index))
+            .attr("cy", d => radarY(axisRadius(d[0][val]) * 0.75, index))
+            .attr("r", 5)
+            .attr("fill", d => d[1])
+    })
+}
+function handleRemovalRadar(e, d) {
+    console.log(d);
+    console.log(radarData);
+    radarData = radarData.filter(ele => ele[1] !== d[1]);
+    console.log(radarData);
+
+    colors.push(d[1]);
+    scatter.select(".nodes").selectAll("circle")
+        .filter(sd => sd === d[0])
+        .attr("fill", "black")
+        .attr("fill-opacity", 0.2);
+    renderRadarChart();
 }
 
 
