@@ -183,9 +183,12 @@ function initVis(_data){
             let el = d3.select(e.target);
             if (el.attr("fill") !== "black" || !colors.length) return;
             let color = colors.pop()
-            el.attr("fill", color)
+            el.transition().duration(500)
+                .attr("fill", color)
                 .attr("fill-opacity", 1)
-                .raise();
+                // .raise()
+                ;
+            el.raise();
             radarData.push([d, color]);
             renderRadarChart();
         });
@@ -295,7 +298,7 @@ function renderRadarChart() {
         .append("g")
         .attr("class", "radar-item");
     
-    radarItem.append("polyline").attr("points", (d) => {
+    radarItem.append("polyline").transition().duration(1000).attr("points", (d) => {
         let a = dimensions.map((val, index) => {
             let axisRadius = d3.scaleLinear()
                 .domain([domain[val][0], domain[val][1]])
@@ -312,6 +315,7 @@ function renderRadarChart() {
             .domain([domain[val][0], domain[val][1]])
             .range([0, radius]);
         radarItem.append("circle")
+            .transition().duration(200 * index)
             .attr("cx", d => radarX(axisRadius(d[0][val]) * 0.75, index))
             .attr("cy", d => radarY(axisRadius(d[0][val]) * 0.75, index))
             .attr("r", 5)
@@ -327,6 +331,8 @@ function handleRemovalRadar(e, d) {
     colors.push(d[1]);
     scatter.select(".nodes").selectAll("circle")
         .filter(sd => sd === d[0])
+        .transition()
+        .duration(500)
         .attr("fill", "black")
         .attr("fill-opacity", 0.2);
     renderRadarChart();
