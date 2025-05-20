@@ -14,6 +14,9 @@ let xAxis, yAxis, xAxisLabel, yAxisLabel;
 // radar chart axes
 let radarAxes, radarAxesAngle;
 
+let colors = d3.schemeCategory10;
+let label;
+let radarData = [];
 let domain = {};
 let dimensions = ["dimension 1", "dimension 2", "dimension 3", "dimension 4", "dimension 5", "dimension 6"];
 //*HINT: the first dimension is often a label; you can simply remove the first dimension with
@@ -56,13 +59,14 @@ function init() {
         .append("g")
         .attr("transform", "translate(" + (width / 2) + "," + (height / 2) + ")");
 
-    legend = d3.select("#legend");
+    legend = d3.select("#legend").append("div");
+    
     // read and parse input file
     let fileInput = document.getElementById("upload"), readFile = function () {
-
+        
         // clear existing visualizations
         clear();
-
+        
         let reader = new FileReader();
         reader.onloadend = function () {
             // console.log("data loaded: ");
@@ -70,7 +74,7 @@ function init() {
             
             // TODO: parse reader.result data and call the init functions with the parsed data!
             data = d3.csvParse(reader.result)
-            console.log(data);
+            label = data.columns[0];
             initVis(data);
             CreateDataTable(data);
             // TODO: possible place to call the dashboard file for Part 2
@@ -147,8 +151,6 @@ function initVis(_data){
         .attr("class", "line")
         .style("stroke", "black");
 
-    // TODO: render grid lines in gray
-
     // TODO: render correct axes labels
     radar.selectAll(".axisLabel")
         .data(dimensions)
@@ -176,7 +178,17 @@ function initVis(_data){
         .enter()
         .append("circle")
         .attr("fill", "black")
-        .attr("fill-opacity", 0.2);
+        .attr("fill-opacity", 0.2)
+        .on("click", (e, d) => {
+            let el = d3.select(e.target);
+            if (el.attr("fill") !== "black" || !colors.length) return;
+            let color = colors.pop()
+            el.attr("fill", color)
+                .attr("fill-opacity", 1)
+                .raise();
+            radarData.push([d, color]);
+            renderRadarChart();
+        });
     
     renderScatterplot();
     renderRadarChart();
@@ -197,10 +209,10 @@ function CreateDataTable(_data) {
 
     // TODO: add headers, row & columns
     let headRow = table.append("tr");
-    dimensions.forEach(dimension => headRow.append("th").attr("class", "tableHeaderClass").text(dimension));
+    _data.columns.forEach(dimension => headRow.append("th").attr("class", "tableHeaderClass").text(dimension));
     _data.forEach(row => {
         let bodyRow = table.append("tr");
-        dimensions.forEach(dimension =>
+        _data.columns.forEach(dimension =>
             bodyRow
                 .append("td")
                 .attr("class", "tableBodyClass")
@@ -249,13 +261,43 @@ function renderScatterplot(){
         .transition().duration(500)
         .attr("cx", d => x(d[xDimension]))
         .attr("cy", d => y(d[yDimension]))
-        .attr("r", d=>r(d[rDimension]));
+        .attr("r", d => r(d[rDimension]));
 }
 
 function renderRadarChart() {
-    
     // TODO: show selected items in legend
+    let legendItem = legend.selectAll(".legend-item")
+        .data(radarData, d=> d[1])
+    
+    legendItem.exit().remove();
 
+    let enterItems = legendItem.enter()
+        .append("div")
+        .attr("class", "legend-item")
+        .style("display", "flex")
+        .style("align-items", "center")
+        .style("gap", "20px")
+        .style("height", "22px");
+    
+    enterItems.append("button").attr("class", "close").text("X").on("click", foo)
+    enterItems.append("div")
+    .style("background-color", d => d[1])
+    .attr("class","color-circle");
+    enterItems.append("p").text(d=>d[0][label]);
+
+    function foo(e, d) {
+        console.log(d);
+        console.log(radarData);
+        radarData = radarData.filter(ele => ele[1] !== d[1]);
+        console.log(radarData);
+
+        colors.push(d[1]);
+        scatter.select(".nodes").selectAll("circle")
+            .filter(sd => sd === d[0])
+            .attr("fill", "black")
+            .attr("fill-opacity", 0.2);
+        renderRadarChart();
+    }
     // TODO: render polylines in a unique color
 }
 
