@@ -14,7 +14,7 @@ let xAxis, yAxis, xAxisLabel, yAxisLabel;
 // radar chart axes
 let radarAxes, radarAxesAngle;
 
-let colors = d3.schemePaired ;
+let colors = d3.schemeCategory10.slice(0,6) ;
 let label;
 let radarData = [];
 let domain = {};
@@ -162,6 +162,19 @@ function initVis(_data){
         .attr("y", function(d, i){ return radarY(axisRadius(textRadius), i); })
         .text(dimension => dimension);
 
+    let greyLines = radar.append('g');
+    for (let j = 1; j <= 6; ++j){
+        dimensions.forEach((dim, index) => {
+            greyLines.append("line")
+            .attr("class", "greyLines")
+            .attr("x1", ()=> radarX(axisRadius(maxAxisRadius * j / 7), index))
+            .attr("y1", ()=> radarY(axisRadius(maxAxisRadius * j / 7), index))
+            .attr("x2", ()=> radarX(axisRadius(maxAxisRadius * j / 7), index + 1))
+            .attr("y2", ()=> radarY(axisRadius(maxAxisRadius * j / 7), index + 1))
+            .attr("class", "line")
+            .style("stroke", "grey");
+        })
+    }
     // init menu for the visual channels
     channels.forEach(function(c){
         initMenu(c, dimensions);
@@ -298,7 +311,7 @@ function renderRadarChart() {
         .append("g")
         .attr("class", "radar-item");
     
-    radarItem.append("polyline").transition().duration(1000).attr("points", (d) => {
+    radarItem.append("polyline").transition().duration(200 * dimensions.length).attr("points", (d) => {
         let a = dimensions.map((val, index) => {
             let axisRadius = d3.scaleLinear()
                 .domain([domain[val][0], domain[val][1]])
