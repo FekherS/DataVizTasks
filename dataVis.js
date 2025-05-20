@@ -14,7 +14,7 @@ let xAxis, yAxis, xAxisLabel, yAxisLabel;
 // radar chart axes
 let radarAxes, radarAxesAngle;
 
-let colors = d3.schemeCategory10;
+let colors = d3.schemePaired ;
 let label;
 let radarData = [];
 let domain = {};
