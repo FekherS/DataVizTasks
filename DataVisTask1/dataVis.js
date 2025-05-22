@@ -248,7 +248,6 @@ function CreateDataTable(_data) {
     };
 }
 function renderScatterplot(){
-
     // TODO: get domain names from menu and label x- and y-axis
     let xDimension = readMenu(channels[0]);
     let yDimension = readMenu(channels[1]);
