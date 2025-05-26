@@ -194,7 +194,7 @@ function initVis(_data){
         .attr("fill-opacity", 0.2)
         .on("click", (e, d) => {
             let el = d3.select(e.target);
-            if (el.attr("fill") !== "black" || !colors.length) return;
+            if ((el.attr("fill") !== "black" && el.attr("fill") !== "rgb(0, 0, 0)") || !colors.length) return;
             let color = colors.pop()
             el.transition().duration(500)
                 .attr("fill", color)
@@ -303,25 +303,34 @@ function renderRadarChart() {
     // TODO: render polylines in a unique color
     let radarItem = radar.selectAll(".radar-item")
         .data(radarData, d => d[1]);
-    
     radarItem.exit().remove();
-
     radarItem = radarItem.enter()
         .append("g")
         .attr("class", "radar-item");
-    
-    radarItem.append("polyline").transition().duration(200 * dimensions.length).attr("points", (d) => {
-        let a = dimensions.map((val, index) => {
-            let axisRadius = d3.scaleLinear()
-                .domain([domain[val][0], domain[val][1]])
-                .range([0, radius]);
-            return [radarX(axisRadius(d[0][val]) * 0.75, index), radarY(axisRadius(d[0][val]) * 0.75, index)];
+    radarItem.append("polyline")
+        .attr("points", (d) => {
+            let a = dimensions.map((val, index) => {
+                let axisRadius = d3.scaleLinear()
+                    .domain([domain[val][0], domain[val][1]])
+                    .range([0, radius]);
+                return [radarX(axisRadius(d[0][val]) * 0.75, index), radarY(axisRadius(d[0][val]) * 0.75, index)];
+            });
+            return a.reduce((acc, val) => acc + val[0] + ',' + val[1] + ' ', "") + a[0][0] + ',' + a[0][1];
         })
-        return a.reduce((acc, val) => acc + val[0] + ',' + val[1] + ' ', "") + " " + a[0][0] + ',' + a[0][1];
-        }).attr("stroke", d => d[1])
+        .attr("stroke", d => d[1])
         .attr("fill-opacity", 0)
-        .attr("stroke-width", 3);  
-    
+        .attr("stroke-width", 3)
+        .attr("fill", "none")
+        .each(function() {
+            const length = this.getTotalLength();
+            d3.select(this)
+                .attr("stroke-dasharray", length)
+                .attr("stroke-dashoffset", length)
+                .transition()
+                .duration(200 * dimensions.length)
+                .ease(d3.easeLinear)
+                .attr("stroke-dashoffset", 0);
+        });
     dimensions.forEach((val, index) => {
         let axisRadius = d3.scaleLinear()
             .domain([domain[val][0], domain[val][1]])
