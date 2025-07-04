@@ -194,13 +194,15 @@ function initVis(_data){
         .attr("fill-opacity", 0.2)
         .on("click", (e, d) => {
             let el = d3.select(e.target);
-            if ((el.attr("fill") !== "black" && el.attr("fill") !== "rgb(0, 0, 0)") || !colors.length) return;
+            if ((el.attr("fill") !== "black" && el.attr("fill") !== "rgb(0, 0, 0)") || !colors.length) {
+                const rd = radarData.find(elem => elem[0] === d);
+                handleRemovalRadar(e, rd);
+                return;
+            }
             let color = colors.pop()
             el.transition().duration(500)
                 .attr("fill", color)
-                .attr("fill-opacity", 1)
-                // .raise()
-                ;
+                .attr("fill-opacity", 1);
             el.raise();
             radarData.push([d, color]);
             renderRadarChart();
@@ -321,22 +323,11 @@ function renderRadarChart() {
         .attr("fill-opacity", 0)
         .attr("stroke-width", 3)
         .attr("fill", "none")
-        .each(function() {
-            const length = this.getTotalLength();
-            d3.select(this)
-                .attr("stroke-dasharray", length)
-                .attr("stroke-dashoffset", length)
-                .transition()
-                .duration(200 * dimensions.length)
-                .ease(d3.easeLinear)
-                .attr("stroke-dashoffset", 0);
-        });
     dimensions.forEach((val, index) => {
         let axisRadius = d3.scaleLinear()
             .domain([domain[val][0], domain[val][1]])
             .range([0, radius]);
         radarItem.append("circle")
-            .transition().duration(200 * index)
             .attr("cx", d => radarX(axisRadius(d[0][val]) * 0.75, index))
             .attr("cy", d => radarY(axisRadius(d[0][val]) * 0.75, index))
             .attr("r", 5)
@@ -344,11 +335,8 @@ function renderRadarChart() {
     })
 }
 function handleRemovalRadar(e, d) {
-    console.log(d);
-    console.log(radarData);
     radarData = radarData.filter(ele => ele[1] !== d[1]);
-    console.log(radarData);
-
+    console.log(d[1]);
     colors.push(d[1]);
     scatter.select(".nodes").selectAll("circle")
         .filter(sd => sd === d[0])

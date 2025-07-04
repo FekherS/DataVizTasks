@@ -1,0 +1,40 @@
+#chart1 {
+	position: relative; /* for tooltip absolute positioning */
+	font-family: sans-serif;
+	max-width: 600px;
+	margin: 0 auto;
+}
+
+#chart1 > #tooltip {
+  /* tooltip styles already set via JS */
+}
+
+#chart1 > .controls {
+	display: flex;
+	align-items: center;
+	gap: 12px;         /* space between controls */
+	margin-bottom: 10px;
+	flex-wrap: wrap;   /* wrap on narrow screens */
+}
+
+#chart1 input[type="range"] {
+	flex: 1 1 200px;   /* slider grows, minimum width 200px */
+	max-width: 300px;
+}
+
+#chart1 button {
+	padding: 6px 12px;
+	cursor: pointer;
+}
+
+#chart1 span#yearLabel {
+	min-width: 40px;
+	text-align: center;
+	font-weight: bold;
+}
+
+.container{
+	display: flex;
+	flex-direction: row;
+	flex-wrap: wrap;
+}
