@@ -323,6 +323,79 @@ function updateChart3() {
 		.attr("class","color-circle");
 	legendItem.append("p").text(d => `${d.owner} up to year: ${d.year + minYear}`);
 	
+	 const radarData = chart3Data.map(d => [ d, d.color ]);
+
+	// 2) bind each owner‐year to a <g class="radar-item">
+	let radarItem = chart3.selectAll(".radar-item")
+		.data(radarData, d => d[1]);
+
+	// exit
+	radarItem.exit().remove();
+
+	// enter
+	radarItem = radarItem.enter()
+		.append("g")
+			.attr("class", "radar-item");
+
+	// append the polyline once per new <g>
+	radarItem.append("polyline")
+		.attr("class", "radar-line")
+		.attr("fill", "none")
+		.attr("stroke-width", 3)
+		.attr("fill-opacity", 0);
+
+	// append one circle per dimension inside each <g>
+	dimensionsChart3.forEach((val, index) => {
+		radarItem.append("circle")
+			.attr("class", "radar-circle")
+			.attr("r", 5);
+	});
+
+	// merge enter + update
+	radarItem = radarItem.merge(chart3.selectAll(".radar-item"));
+
+	// radius used in initChart3
+	const radius = 250;
+
+	// per‐dimension linear scales
+	const axisScales = {};
+	dimensionsChart3.forEach(dim => {
+		axisScales[dim] = d3.scaleLinear()
+			.domain([ chart3Domain[dim][0], chart3Domain[dim][1] ])
+			.range([ 0, radius ]);
+	});
+
+	// update polyline “points” for each group
+	radarItem.select("polyline")
+		.attr("stroke", d => d[1])
+		.attr("points", d => {
+			// compute one [x,y] per dimension, then close the loop
+			const pts = dimensionsChart3.map((dim, i) => {
+				const r = axisScales[dim](d[0][dim]) * 0.75;
+				return [ chart3X(r, i), chart3Y(r, i) ];
+			});
+			pts.push(pts[0]);
+			return pts.map(p => p.join(",")).join(" ");
+		});
+
+	// update each circle’s position & color
+	radarItem.selectAll("circle")
+		.data(d => dimensionsChart3.map((dim, i) => ({
+			dim,
+			value: d[0][dim],
+			color: d[1],
+			angleIndex: i
+		})))
+		.attr("cx", d => {
+			const r = axisScales[d.dim](d.value) * 0.75;
+			return chart3X(r, d.angleIndex);
+		})
+		.attr("cy", d => {
+			const r = axisScales[d.dim](d.value) * 0.75;
+			return chart3Y(r, d.angleIndex);
+		})
+		.attr("fill", d => d.color);
+
 
 }
 

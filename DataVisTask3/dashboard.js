@@ -17,7 +17,6 @@ function initDashboard(_data) {
     console.log(_data.columns);
     createChart123(_data);
     createChart4(_data);
-    createChart5(_data);
 }
 
 // clear files if changes (dataset) occur
