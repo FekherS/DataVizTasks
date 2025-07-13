@@ -7,7 +7,12 @@ const owners = new Map();
 
 let countriesISO = new Map(), chart2Data = Array.from({length: maxYear - minYear + 1}, () => new Map());
 
-const dimensionsChart3 = ["perigee_km", "apogee_km","inclination_degrees","period_minutes",  "launch_mass_kg", "expected_lifetime_yrs"];
+const dimensionsChart3 = ["perigee_km", "apogee_km", "inclination_degrees", "period_minutes", "launch_mass_kg", "expected_lifetime_yrs"];
+let colorsChart3 = d3.schemeCategory10.slice(0,6), chart3Data = [], chart3Domain ={};
+let chart3AxesAngle = Math.PI * 2 / dimensionsChart3.length;
+let chart3Axes;
+let chart3Legend;
+let chart3FullData;
 
 function createChart123(data) {
 	chart1 = d3.select("#chart1").append("svg")
@@ -21,6 +26,9 @@ function createChart123(data) {
 	chart3 = d3.select("#chart3").append("svg")
 		.attr("width", width)
 		.attr("height", height)
+		.append("g")
+		.attr("transform", "translate(" + (width / 2) + "," + (height / 2) + ")");
+	chart3FullData = data;
 
 	const operator_country = Array.from(new Set(data.map(d => d.operator_country)));
 	colorScale1 = d3.scaleOrdinal()
@@ -29,9 +37,9 @@ function createChart123(data) {
 
 	initChart1(data);
 	initChart2(data);
+	initChart3(data);
 	initControls(data);
 }
-
 function initControls() {
 	tooltipDash = d3.select("#tooltipDash");
 	const ctrl = d3.select('#controls');
@@ -81,7 +89,6 @@ function initControls() {
 			}
 		});
 }
-
 function initChart1(data) {
 	//set up the data.
 	data.forEach(d => {
@@ -107,7 +114,6 @@ function initChart1(data) {
 	updateChart1(maxYear);
 
 }
-
 function updateChart1(selectedYear) {
 	const yearIndex = selectedYear - minYear;
 	const pack = d3.pack()
@@ -121,22 +127,36 @@ function updateChart1(selectedYear) {
 	const circles = chart1.select("g")
 		.selectAll("circle")
 		.data(root.leaves(), d => d.data.owner);
-	circles.join("circle")
-		.transition().duration(750)
-		.attr("cx", d => d.x)
-		.attr("cy", d => d.y)
-		.attr("r", d => d.r)
-		.attr("fill", d => colorScale1(owners.get(d.data.owner)));
 	
-	circles.on("mouseover", (event, d) => {
+	const joinedCircles = circles.join("circle")
+	.attr("fill", d => colorScale1(owners.get(d.data.owner))); // static props first
+
+	// Apply transition separately
+	joinedCircles.transition().duration(750)
+	.attr("cx", d => d.x)
+	.attr("cy", d => d.y)
+	.attr("r", d => d.r);
+
+	// Attach events to the joined selection (not the transition)
+	joinedCircles
+	.on("mouseover", (event, d) => {
 		const value = chart1Data[yearIndex].get(d.data.owner);
 		tooltipDash.style("opacity", 1)
-			.html(`<strong>${d.data.owner}</strong><br/>Country: ${d.data.country}<br/>Value: ${value}`)
-			.style("left", (event.pageX + 10) + "px")
-			.style("top", (event.pageY + 10) + "px");
-		}).on("mouseout", () => {
-			tooltipDash.style("opacity", 0);
-		});
+		.html(`<strong>${d.data.owner}</strong><br/>Country: ${d.data.country}<br/>Value: ${value}`)
+		.style("left", (event.pageX + 10) + "px")
+		.style("top", (event.pageY + 10) + "px");
+	})
+	.on("mouseout", () => {
+		tooltipDash.style("opacity", 0);
+	})
+	.on("click", (e, d) => {
+		if (!colorsChart3.length) return;
+		const result = chart3Data.find(elem => elem.owner === d.data.owner && elem.year === yearIndex);
+		if (result) return;
+		chart3Data.push({ owner: d.data.owner, year: yearIndex, color: colorsChart3.pop() });
+		updateChart3();
+	});
+
 	
 	const texts = chart1.select("g")
 		.selectAll("text")
@@ -226,4 +246,101 @@ function updateChart2(year) {
 			const val = countriesISO.get(+d.id);
 			return (val != null && chart2Data[index].get(val))? colorScale1(val) : '#eee';
 		});
+}
+
+function initChart3(data) {
+	dimensionsChart3.forEach((dim) => chart3Domain[dim] = [d3.min(data, d => Number(d[dim])), d3.max(data, d => Number(d[dim]))]);
+	let radius = 250;
+	let r = d3.scaleLinear()
+		.range([0, radius]);
+	let axisRadius = d3.scaleLinear()
+		.range([0, radius]);
+	let maxAxisRadius = 0.75, textRadius = 0.8, gridRadius = 0.1;
+	
+	chart3Axes = chart3.selectAll(".axis")
+		.data(dimensionsChart3)
+		.enter()
+		.append("g")
+		.attr("class", "axis");
+
+	chart3Axes.append("line")
+		.attr("x1", 0)
+		.attr("y1", 0)
+		.attr("x2", function(d, i){ return chart3X(axisRadius(maxAxisRadius), i); })
+		.attr("y2", function(d, i){ return chart3Y(axisRadius(maxAxisRadius), i); })
+		.attr("class", "line")
+		.attr("stroke", "black");
+	
+	chart3.selectAll(".axisLabel")
+		.data(dimensionsChart3)
+		.enter()
+		.append("text")
+		.attr("text-anchor", "middle")
+		.attr("dy", "0.35em")
+		.attr("x", function(d, i){ return chart3X(axisRadius(textRadius), i); })
+		.attr("y", function(d, i){ return chart3Y(axisRadius(textRadius), i); })
+		.text(dimension => dimension);
+	
+	let greyLines = chart3.append('g');
+	for (let j = 1; j <= 6; ++j){
+		dimensionsChart3.forEach((dim, index) => {
+			greyLines.append("line")
+			.attr("class", "greyLines")
+			.attr("x1", ()=> chart3X(axisRadius(maxAxisRadius * j / 7), index))
+			.attr("y1", ()=> chart3Y(axisRadius(maxAxisRadius * j / 7), index))
+			.attr("x2", ()=> chart3X(axisRadius(maxAxisRadius * j / 7), index + 1))
+			.attr("y2", ()=> chart3Y(axisRadius(maxAxisRadius * j / 7), index + 1))
+			.attr("class", "line")
+			.style("stroke", "grey");
+		})
+	}
+	
+	chart3Legend = d3.select("#chart3-legend").append("div");
+	chart3Legend.append("h3").text("Legend");
+}
+
+function updateChart3() {
+	chart3Data.forEach(elem => {
+		let _data = chart3FullData.filter(ele => ele.owner === elem.owner && +ele.date_of_launch <= (elem.year + minYear));
+		dimensionsChart3.forEach(dim => {
+			elem[dim] = d3.mean(_data, d => +d[dim]);
+		});
+	});
+	let legendItem = chart3Legend.selectAll(".legend-item")
+		.data(chart3Data, d => d.color);
+	
+	legendItem.exit().remove();
+	legendItem = legendItem.enter()
+		.append("div")
+		.attr("class", "legend-item")
+		.style("display", "flex")
+		.style("align-items", "center")
+		.style("gap", "20px")
+		.style("height", "22px");
+	legendItem.append("button").attr("class", "close").text("X").on("click", handleRemovalChart3)
+	legendItem.append("div")
+		.style("background-color", d => d.color)
+		.attr("class","color-circle");
+	legendItem.append("p").text(d => `${d.owner} up to year: ${d.year + minYear}`);
+	
+
+}
+
+function handleRemovalChart3(e, d) {
+	chart3Data = chart3Data.filter(ele => ele.color !== d.color);
+	colorsChart3.push(d.color);
+	updateChart3();
+}
+
+
+function chart3X(radius, index){
+	return radius * Math.cos(chart3Angle(index));
+}
+
+function chart3Y(radius, index){
+	return radius * Math.sin(chart3Angle(index));
+}
+
+function chart3Angle(index){
+	return chart3AxesAngle * index - Math.PI / 2;
 }
