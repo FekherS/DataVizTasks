@@ -202,7 +202,7 @@ async function initChart2(data) {
 	const pathGen = d3.geoPath().projection(projection);
 
 	try {
-		const topo = await d3.json('./js/world-110m.json');
+		const topo = await d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
 
 		const countries = topojson
 			.feature(topo, topo.objects.countries)
@@ -404,7 +404,6 @@ function handleRemovalChart3(e, d) {
 	colorsChart3.push(d.color);
 	updateChart3();
 }
-
 
 function chart3X(radius, index){
 	return radius * Math.cos(chart3Angle(index));
