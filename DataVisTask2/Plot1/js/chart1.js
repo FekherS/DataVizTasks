@@ -1,248 +1,255 @@
-const width = 500;
-const height = 500;
-const margin = 1;
+import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 
-let chart1;
-let data;
-let tooltip = d3.select("#tooltip");
-let slider;
-let yearLabel;
-let playBtn;
-let pauseBtn;
-let nodesGroup;
+const width = 600;
+const height = 600;
 const ease = d3.easeCubic;
-let intervalId = null;
 
-let countryColorMap;
+const colors = d3.schemeCategory10.slice();
+let colorMap = new Map();
 
-export default function initChart1(_data) {
-	configureData(_data);
-	configureChart();
-	createCountryColorMap();
-	updateChart();
+const dimensions = ['longitude_of_geo_degrees','perigee_km','apogee_km','eccentricity','inclination_degrees','period_minutes','launch_mass_kg' ];
+const domain = {};
+const radarRadius = 200;
+
+let radarAxesAngle = Math.PI * 2 / dimensions.length;
+let radarData = [];
+
+let countryCoords = new Map();
+let nameToAlpha3 = new Map();
+
+let bubbleSvg, mapSvg, radarSvg;
+let bubbleGroup, mapGroup;
+let slider, yearLabel;
+
+let tooltip = d3.select("#tooltip");
+let radarLegend;
+
+let fullData = [];
+
+d3.csv('./country_codes_simple_cleaned.csv').then(mapping => {
+    mapping.forEach(d => {
+        nameToAlpha3.set(d.name, d.alpha3);
+        countryCoords.set(d.alpha3, { lat: +d.latitude, lon: +d.longitude });
+    });
+
+    d3.csv('./UCSDB.csv').then(data => {
+        
+        init(data);
+    });
+});
+
+function init(data) {
+    fullData = data.map(d => ({
+        satellite_name: d.satellite_name,
+        operator_country: d.operator_country,
+        owner: d.owner,
+        date_of_launch: new Date(d.date_of_launch),
+        launch_mass_kg: +d.launch_mass_kg,
+        expected_lifetime_yrs: +d.expected_lifetime_yrs
+    }));
+
+    dimensions.forEach(dim => {
+        const vals = fullData.map(d => d[dim]).filter(v => !isNaN(v));
+        domain[dim] = [d3.min(vals), d3.max(vals)];
+    });
+
+    createColorMap();
+    createControls();
+    createCharts();
+    updateCharts();
 }
 
-function configureData(_data) {
-	data = _data.map(d => {
-		const dateStr = d["Date of Launch"];
-		const [day, month, year] = dateStr.split(' ')[0].split('/').map(Number);
-
-		let countryStr = d["Country of Operator/Owner"] || "";
-		let countries = countryStr.split('/');
-		countries = countries.map(c => c.trim()).filter(c => c.length > 0);
-		let mainCountry = countries[0] || "Unknown";
-
-		return {
-			name: d["Operator/Owner"],
-			country: mainCountry,
-			year: new Date(year, month - 1, day).getFullYear()
-		};
-	});
+function createColorMap() {
+    const countries = [...new Set(fullData.map(d => d.operator_country))];
+    const scale = d3.scaleSequential().domain([0, countries.length]).interpolator(d3.interpolateRainbow);
+    countries.forEach((c, i) => colorMap.set(c, scale(i)));
 }
 
-function createCountryColorMap() {
-	const uniqueCountries = [...new Set(data.map(d => d.country))];
-	const colorScale = d3.scaleSequential()
-		.domain([0, uniqueCountries.length])
-		.interpolator(d3.interpolateRainbow);
+function createControls() {
+    slider = d3.select("#controls").append("input")
+        .attr("type", "range")
+        .attr("min", 1970)
+        .attr("max", 2025)
+        .attr("value", 2025)
+        .on("input", () => {
+            yearLabel.text(slider.property("value"));
+            updateCharts(+slider.property("value"));
+        });
 
-	countryColorMap = new Map();
-	uniqueCountries.forEach((country, i) => {
-		countryColorMap.set(country, colorScale(i));
-	});
-	drawLegend();
+    yearLabel = d3.select("#controls").append("span").text("2025");
 }
 
-function drawLegend() {
-	// Remove existing legend if any
-	d3.select("#legend").remove();
+function createCharts() {
+    bubbleSvg = d3.select("#chart1").append("svg").attr("width", width).attr("height", height);
+    bubbleGroup = bubbleSvg.append("g");
 
-	// Append legend container dynamically
-	d3.select("body")
-		.append("div")
-		.attr("id", "legend")
-		.style("max-height", "400px")
-		.style("overflow-y", "auto")
-		.style("border", "1px solid #ccc")
-		.style("padding", "10px")
-		.style("width", "200px")
-		.style("font", "12px sans-serif");
+    mapSvg = d3.select("#chart2").append("svg").attr("width", width).attr("height", height);
+    mapGroup = mapSvg.append("g");
 
-	const legend = d3.select("#legend")
-		.append("div")
-		.attr("class", "legend-grid")
-		.style("display", "flex")
-		.style("flex-direction", "column");
+    radarSvg = d3.select("#chart3").append("svg").attr("width", width).attr("height", height)
+        .append("g").attr("transform", `translate(${width/2},${height/2})`);
 
-	[...countryColorMap.keys()].forEach(country => {
-		const item = legend.append("div")
-			.style("display", "flex")
-			.style("align-items", "center")
-			.style("margin-bottom", "5px");
-
-		item.append("span")
-			.style("display", "inline-block")
-			.style("width", "15px")
-			.style("height", "15px")
-			.style("background-color", countryColorMap.get(country))
-			.style("margin-right", "5px");
-
-		item.append("span")
-			.text(country);
-	});
+    drawRadarBase();
+    radarLegend = d3.select("#chart3").append("div").attr("id", "radar-legend");
 }
 
-function configureChart() {
-	const container = d3.select("#chart1");
-
-	const controls = container.append("div")
-		.attr("class", "controls");
-
-	slider = controls.append("input")
-		.attr("type", "range")
-		.attr("id", "yearSlider")
-		.attr("min", 1974)
-		.attr("max", 2023)
-		.attr("value", 1974)
-		.attr("step", 1);
-
-	slider.on("input", () => {
-		const year = +slider.property("value");
-		yearLabel.text(year);
-		updateChart(year);
-		if (intervalId !== null) stopPlaying();
-	});
-
-	yearLabel = controls.append("span")
-		.attr("id", "yearLabel")
-		.text("1974");
-
-	playBtn = controls.append("button")
-		.attr("id", "playBtn")
-		.text("Play")
-		.on("click", startPlaying);
-
-	pauseBtn = controls.append("button")
-		.attr("id", "pauseBtn")
-		.attr("disabled", true)
-		.text("Pause")
-		.on("click", stopPlaying);
-
-	chart1 = container.append("svg")
-		.attr("width", width)
-		.attr("height", height)
-		.attr("viewBox", [0, 0, width, height])
-		.attr("style", "max-width: 100%; height: auto; font: 10px sans-serif;")
-		.attr("text-anchor", "middle");
-
-	nodesGroup = chart1.append("g").attr("class", "nodes");
+function updateCharts(year = 2023) {
+    const filtered = fullData.filter(d => d.date_of_launch.getFullYear() <= year);
+    updateBubbleChart(filtered);
+    updateMapChart(filtered);
+    renderRadarChart();
 }
 
-function updateChart(filterYear = 1974) {
-	const filteredData = data.filter(d => d.year <= filterYear);
+function updateBubbleChart(data) {
+    const grouped = d3.rollups(data, v => v.length, d => d.owner)
+        .map(([owner, count]) => ({ owner, count }));
 
-	const countMap = new Map();
-	filteredData.forEach(d => {
-		const key = `${d.name}|${d.country}`;
-		countMap.set(key, (countMap.get(key) || 0) + 1);
-	});
+    const pack = d3.pack()
+        .size([width, height])
+        .padding(5);
 
-	const dataArray = Array.from(countMap, ([key, value]) => {
-		const [name, country] = key.split('|');
-		return { name, country, value };
-	}).sort((a, b) => d3.ascending(a.name, b.name));
+    const root = d3.hierarchy({ children: grouped }).sum(d => d.count);
+    const nodes = pack(root).leaves();
 
-	const pack = d3.pack()
-		.size([width - margin * 2, height - margin * 2])
-		.padding(3);
+    const sel = bubbleGroup.selectAll("g").data(nodes, d => d.data.owner);
 
-	const root = pack(d3.hierarchy({ children: dataArray }).sum(d => d.value));
+    const enter = sel.enter().append("g")
+        .attr("transform", d => `translate(${d.x},${d.y})`)
+        .on("click", (e, d) => addToRadar(d.data.owner));
 
-	const nodes = nodesGroup.selectAll("g.node")
-		.data(root.leaves(), d => d.data.name + d.data.country);
+    enter.append("circle").attr("r", 0)
+        .attr("fill", d => colorMap.get(d.data.owner) || "grey");
 
-	const nodesEnter = nodes.enter().append("g")
-		.attr("class", "node")
-		.attr("transform", d => `translate(${d.x},${d.y})`)
-		.attr("opacity", 0);
+    enter.append("text")
+        .text(d => d.data.owner)
+        .attr("dy", ".35em")
+        .attr("text-anchor", "middle")
+        .style("fill", "white")
+        .style("font-size", "10px");
 
-	nodesEnter.append("circle")
-		.attr("fill-opacity", 0.7)
-		.attr("fill", d => countryColorMap.get(d.data.country))
-		.attr("r", 0);
+    sel.merge(enter).select("circle")
+        .transition().ease(ease).duration(500)
+        .attr("r", d => d.r);
 
-	nodesEnter.append("text")
-		.attr("dy", "-0.2em")
-		.attr("text-anchor", "middle")
-		.attr("fill", "white");
+    sel.merge(enter)
+        .transition().ease(ease).duration(500)
+        .attr("transform", d => `translate(${d.x},${d.y})`);
 
-	nodes.merge(nodesEnter)
-		.transition()
-		.duration(750)
-		.ease(ease)
-		.attr("transform", d => `translate(${d.x},${d.y})`)
-		.attr("opacity", 1)
-		.select("circle")
-		.attr("r", d => d.r);
-
-	nodes.merge(nodesEnter).select("text")
-		.each(function(d) {
-			const text = d3.select(this);
-			text.selectAll("tspan").remove();
-			text.append("tspan")
-				.text(d.data.name)
-				.attr("x", 0)
-				.attr("dy", 0);
-			text.append("tspan")
-				.text(d.data.value)
-				.attr("x", 0)
-				.attr("dy", "1.2em");
-		})
-		.style("font-size", d => `${Math.min(2 * d.r / Math.max(1, d.data.name.length), 12)}px`);
-
-	nodes.exit()
-		.transition()
-		.duration(500)
-		.ease(ease)
-		.attr("opacity", 0)
-		.remove();
-
-	nodesEnter.merge(nodes)
-		.on("mouseover", (event, d) => {
-			tooltip.style("opacity", 1)
-				.html(`${d.data.name} (${d.data.country}) : ${d.data.value}`)
-				.style("left", (event.pageX + 10) + "px")
-				.style("top", (event.pageY + 10) + "px");
-		})
-		.on("mousemove", (event) => {
-			tooltip.style("left", (event.pageX + 10) + "px")
-				.style("top", (event.pageY + 10) + "px");
-		})
-		.on("mouseout", () => {
-			tooltip.style("opacity", 0);
-		});
+    sel.exit().remove();
 }
 
-function stopPlaying() {
-	playBtn.property("disabled", false);
-	pauseBtn.property("disabled", true);
-	if (intervalId !== null) {
-		clearInterval(intervalId);
-		intervalId = null;
-	}
+function updateMapChart(data) {
+    const grouped = d3.rollups(data, v => v.length, d => d.operator_country)
+        .map(([country, count]) => ({ country, count }));
+
+    const points = grouped.map(d => {
+        const iso = nameToAlpha3.get(d.country) || "UNK";
+        const coords = countryCoords.get(iso);
+        if (!coords) return null;
+        return {
+            country: d.country,
+            count: d.count,
+            x: ((coords.lon + 180) / 360) * width,
+            y: height - ((coords.lat + 90) / 180) * height
+        };
+    }).filter(Boolean);
+
+    const sel = mapGroup.selectAll("circle").data(points, d => d.country);
+
+    const enter = sel.enter().append("circle")
+        .attr("r", 0)
+        .attr("fill", d => colorMap.get(d.country) || "grey")
+        .on("click", (e, d) => addToRadar(d.country));
+
+    sel.merge(enter)
+        .transition().ease(ease).duration(500)
+        .attr("cx", d => d.x)
+        .attr("cy", d => d.y)
+        .attr("r", d => Math.sqrt(d.count));
+
+    sel.exit().remove();
 }
 
-function startPlaying() {
-	playBtn.property("disabled", true);
-	pauseBtn.property("disabled", false);
-	intervalId = setInterval(() => {
-		let currentYear = +slider.property("value");
-		if (currentYear >= +slider.attr("max")) {
-			stopPlaying();
-			return;
-		}
-		slider.property("value", currentYear + 1);
-		yearLabel.text(currentYear + 1);
-		updateChart(currentYear + 1);
-	}, 1000);
+function drawRadarBase() {
+    dimensions.forEach((dim, i) => {
+        radarSvg.append("line")
+            .attr("x1", 0).attr("y1", 0)
+            .attr("x2", radarX(1, i)).attr("y2", radarY(1, i))
+            .attr("stroke", "black");
+
+        radarSvg.append("text")
+            .attr("x", radarX(1.1, i)).attr("y", radarY(1.1, i))
+            .text(dim)
+            .attr("text-anchor", "middle");
+    });
+
+    for (let i = 0; i < 5; i++) {
+        const r = (i + 1) / 5 * radarRadius;
+        const points = dimensions.map((_, j) => [radarX(r, j), radarY(r, j)]);
+        points.push(points[0]);
+        radarSvg.append("path")
+            .attr("d", d3.line()(points))
+            .attr("stroke", "grey")
+            .attr("fill", "none");
+    }
+}
+
+function radarX(r, i) {
+    return r * Math.cos(radarAxesAngle * i - Math.PI/2);
+}
+
+function radarY(r, i) {
+    return r * Math.sin(radarAxesAngle * i - Math.PI/2);
+}
+
+function addToRadar(name) {
+    if (radarData.find(d => d.name === name)) return;
+
+    const color = colors.pop();
+    const relevant = fullData.filter(d => d.owner === name || d.operator_country === name);
+
+    const avg = {};
+    dimensions.forEach(dim => {
+        const vals = relevant.map(d => d[dim]).filter(v => !isNaN(v));
+        avg[dim] = vals.length ? d3.mean(vals) : 0;
+    });
+
+    radarData.push({ name, avg, color });
+    renderRadarChart();
+}
+
+function renderRadarChart() {
+    radarSvg.selectAll(".radar-item").remove();
+
+    radarData.forEach(d => {
+        const points = dimensions.map((dim, i) => {
+            const scale = d3.scaleLinear().domain(domain[dim]).range([0, radarRadius]);
+            const r = scale(d.avg[dim]);
+            return [radarX(r, i), radarY(r, i)];
+        });
+        points.push(points[0]);
+
+        radarSvg.append("path")
+            .datum(points)
+            .attr("class", "radar-item")
+            .attr("d", d3.line())
+            .attr("stroke", d.color)
+            .attr("fill", d.color)
+            .attr("fill-opacity", 0.1)
+            .attr("stroke-width", 2);
+    });
+
+    const items = radarLegend.selectAll("div").data(radarData, d => d.name);
+
+    const enter = items.enter().append("div");
+    enter.append("span").text(d => d.name);
+    enter.append("button").text("Remove").on("click", (e, d) => removeRadarItem(d));
+
+    items.exit().remove();
+}
+
+function removeRadarItem(d) {
+    radarData = radarData.filter(x => x.name !== d.name);
+    colors.push(d.color);
+    renderRadarChart();
 }

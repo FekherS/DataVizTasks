@@ -5,28 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/topojson-client@3"></script>
     <link rel="stylesheet" href="style.css">
+
 </head>
 <body>
-    <div id="tooltip" style="
-            position: absolute;
-            background-color: #333;
-            color: white;
-            padding: 5px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.2s;
-            white-space: nowrap;
-            z-index: 10;
-            "></div>
-    <div class = container>
-        <div id="chart1"></div>
-        <div id="chart2"></div>
-        <div id="chart3"></div>
-        <div id="chart4"></div>
-    </div>
-    <script type="module" src="dashboard.js"></script>
+
+    <div id="tooltip" style="position:absolute; background:#fff; border:1px solid #ccc; padding:5px; opacity:0;"></div>
+    <div id="chart1"></div>
+    <div id="chart2"></div>
+    <div id="chart3"></div>
+    <script src="dashboard.js"></script>
 </body>
 </html>
