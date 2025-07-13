@@ -21,8 +21,10 @@ function initDashboard(_data) {
 
 // clear files if changes (dataset) occur
 function clearDashboard() {
-    chart1.selectAll("*").remove();
-    chart2.selectAll("*").remove();
-    chart3.selectAll("*").remove();
-    chart4.selectAll("*").remove();
+    d3.select("#chart1").selectAll("*").remove();
+    d3.select("#chart2").selectAll("*").remove();
+    d3.select("#chart3").selectAll("*").remove();
+    d3.select("#chart4").selectAll("*").remove();
+    d3.select('#controls').selectAll("*").remove();
+    d3.select("#chart3-legend").selectAll("*").remove();
 }

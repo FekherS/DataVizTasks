@@ -220,6 +220,7 @@ function clear(){
     scatter.selectAll("*").remove();
     radar.selectAll("*").remove();
     dataTable.selectAll("*").remove();
+    clearDashboard();
 }
 
 //Create Table

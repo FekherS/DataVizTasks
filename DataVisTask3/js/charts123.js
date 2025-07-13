@@ -40,6 +40,7 @@ function createChart123(data) {
 	initChart3(data);
 	initControls(data);
 }
+
 function initControls() {
 	tooltipDash = d3.select("#tooltipDash");
 	const ctrl = d3.select('#controls');
@@ -89,6 +90,7 @@ function initControls() {
 			}
 		});
 }
+
 function initChart1(data) {
 	//set up the data.
 	data.forEach(d => {
@@ -114,6 +116,7 @@ function initChart1(data) {
 	updateChart1(maxYear);
 
 }
+
 function updateChart1(selectedYear) {
 	const yearIndex = selectedYear - minYear;
 	const pack = d3.pack()
@@ -180,6 +183,7 @@ function updateChart1(selectedYear) {
 			tooltipDash.style("opacity", 0);
 	});
 }
+
 async function initChart2(data) {
 	data.forEach(d => {
 		if (d.operator_iso_num && !countriesISO.has(d.operator_iso_num) ) {
@@ -238,6 +242,7 @@ async function initChart2(data) {
 		console.error('Error loading or processing TopoJSON:', error);
 	}
 }
+
 function updateChart2(year) {
 	let index = year - minYear;
 	chart2.selectAll('g.countries path')
