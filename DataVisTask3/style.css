@@ -80,7 +80,6 @@ svg {
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
-    gap: 10px;
     justify-content: space-around;
 }
 
@@ -176,4 +175,9 @@ div.tooltip {
 
 h4{
     max-width: 500px;
+}
+
+#controls{
+    position:sticky;
+    top: 100px;
 }

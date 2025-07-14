@@ -14,6 +14,8 @@ let chart3Axes;
 let chart3Legend;
 let chart3FullData;
 
+let hoveredCountry = null;
+
 function createChart123(data) {
 	chart1 = d3.select("#chart1").append("svg")
 		.attr("width", width)
@@ -24,10 +26,6 @@ function createChart123(data) {
 		.attr("height", height)
 
 	chart3 = d3.select("#chart3").append("svg")
-		.attr("width", width)
-		.attr("height", height)
-		.append("g")
-		.attr("transform", "translate(" + (width / 2) + "," + (height / 2) + ")");
 	chart3FullData = data;
 
 	const operator_country = Array.from(new Set(data.map(d => d.operator_country)));
@@ -132,7 +130,13 @@ function updateChart1(selectedYear) {
 		.data(root.leaves(), d => d.data.owner);
 	
 	const joinedCircles = circles.join("circle")
-	.attr("fill", d => colorScale1(owners.get(d.data.owner))); // static props first
+		.attr("fill", d => {
+			// colorScale1(owners.get(d.data.owner))
+			if (!hoveredCountry || hoveredCountry === d.data.country) {
+				return colorScale1(d.data.country);
+			}
+			return "gray"
+		}); // static props first
 
 	// Apply transition separately
 	joinedCircles.transition().duration(750)
@@ -170,8 +174,16 @@ function updateChart1(selectedYear) {
 		.attr("y", d => d.y)
 		.attr("text-anchor", "middle")
 		.attr("dy", "0.35em")
-		.style("font-size", d => Math.min(2 * d.r / d.data.owner.length, 14) + "px")
-		.text(d => d.data.owner)
+		.style("font-size", d => Math.min(3.5 * d.r / d.data.owner.length, 14) + "px")
+		.style("fill", d => {
+			// Use same logic as circles
+			const circleFill = (!hoveredCountry || hoveredCountry === owners.get(d.data.owner))
+				? colorScale1(owners.get(d.data.owner))
+				: "gray";
+			return getReadableTextColor(circleFill);
+		})
+		.text(d => d.data.owner);
+
 	texts.on("mouseover", (event, d) => {
 			const value = chart1Data[yearIndex].get(d.data.owner);
 			tooltipDash.style("opacity", 1)
@@ -182,6 +194,20 @@ function updateChart1(selectedYear) {
 		.on("mouseout", () => {
 			tooltipDash.style("opacity", 0);
 	});
+}
+function getReadableTextColor(fillColor) {
+	// Use d3.color to parse the fill color
+	const c = d3.color(fillColor);
+	if (!c) return "#000"; // fallback to black
+
+	// Calculate relative luminance
+	const r = c.r / 255;
+	const g = c.g / 255;
+	const b = c.b / 255;
+
+	const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+
+	return luminance > 0.5 ? "#000" : "#fff";
 }
 
 async function initChart2(data) {
@@ -202,7 +228,7 @@ async function initChart2(data) {
 		}
 	})	
 	const projection = d3.geoNaturalEarth1()
-		.fitSize([width * 2, height], { type: 'Sphere' });
+		.fitSize([width * 2, height ], { type: 'Sphere' });
 	const pathGen = d3.geoPath().projection(projection);
 
 	try {
@@ -228,7 +254,6 @@ async function initChart2(data) {
 				if (val && chart2Data[yearNum - minYear].get(val)) {	
 					tooltipDash
 						.style('opacity', 1)
-						// .html(`Value: ${val}`)
 						.html(`<strong>${val}</strong><br/>Value: ${chart2Data[yearNum - minYear].get(val)}`)
 						.style('left', (event.pageX + 10) + 'px')
 						.style('top', (event.pageY + 10) + 'px');
@@ -236,8 +261,23 @@ async function initChart2(data) {
 			})
 			.on('mouseout', () => {
 				tooltipDash.style('opacity', 0);
+			})
+			.on('click', (event, d) => {
+				const val = countriesISO.get(+d.id);
+				const yearStr = d3.select('#yearLabel').text();
+				const yearNum = +yearStr;
+
+				if (hoveredCountry === val) {
+					hoveredCountry = null;
+				} else {
+					hoveredCountry = val;
+				}
+
+				console.log(hoveredCountry);
+				updateChart1(yearNum);
 			});
-		updateChart2(maxYear)
+
+		updateChart2(maxYear);
 	} catch (error) {
 		console.error('Error loading or processing TopoJSON:', error);
 	}
@@ -253,171 +293,154 @@ function updateChart2(year) {
 		});
 }
 
+// Initialize parallel‐coords + empty legend container
 function initChart3(data) {
-	dimensionsChart3.forEach((dim) => chart3Domain[dim] = [d3.min(data, d => Number(d[dim])), d3.max(data, d => Number(d[dim]))]);
-	let radius = 250;
-	let r = d3.scaleLinear()
-		.range([0, radius]);
-	let axisRadius = d3.scaleLinear()
-		.range([0, radius]);
-	let maxAxisRadius = 0.75, textRadius = 0.8, gridRadius = 0.1;
-	
-	chart3Axes = chart3.selectAll(".axis")
-		.data(dimensionsChart3)
-		.enter()
-		.append("g")
-		.attr("class", "axis");
+	// 1) compute full domains
+	dimensionsChart3.forEach(dim => {
+		chart3Domain[dim] = [
+			d3.min(data, d => +d[dim]),
+			d3.max(data, d => +d[dim])
+		];
+	});
 
-	chart3Axes.append("line")
-		.attr("x1", 0)
-		.attr("y1", 0)
-		.attr("x2", function(d, i){ return chart3X(axisRadius(maxAxisRadius), i); })
-		.attr("y2", function(d, i){ return chart3Y(axisRadius(maxAxisRadius), i); })
-		.attr("class", "line")
-		.attr("stroke", "black");
-	
-	chart3.selectAll(".axisLabel")
-		.data(dimensionsChart3)
-		.enter()
-		.append("text")
-		.attr("text-anchor", "middle")
-		.attr("dy", "0.35em")
-		.attr("x", function(d, i){ return chart3X(axisRadius(textRadius), i); })
-		.attr("y", function(d, i){ return chart3Y(axisRadius(textRadius), i); })
-		.text(dimension => dimension);
-	
-	let greyLines = chart3.append('g');
-	for (let j = 1; j <= 6; ++j){
-		dimensionsChart3.forEach((dim, index) => {
-			greyLines.append("line")
-			.attr("class", "greyLines")
-			.attr("x1", ()=> chart3X(axisRadius(maxAxisRadius * j / 7), index))
-			.attr("y1", ()=> chart3Y(axisRadius(maxAxisRadius * j / 7), index))
-			.attr("x2", ()=> chart3X(axisRadius(maxAxisRadius * j / 7), index + 1))
-			.attr("y2", ()=> chart3Y(axisRadius(maxAxisRadius * j / 7), index + 1))
-			.attr("class", "line")
-			.style("stroke", "grey");
-		})
-	}
-	
-	chart3Legend = d3.select("#chart3-legend").append("div");
+	// 2) clear previous visuals
+	d3.select("#chart3-legend").selectAll("*").remove();
+
+	// 3) build legend container
+	chart3Legend = d3.select("#chart3-legend")
+		.append("div");
 	chart3Legend.append("h3").text("Legend");
+
+
+
+	// 5) SVG group
+	const g = chart3
+		.attr("viewBox", [0, 0, width + margin.left + margin.right, height + margin.top + margin.bottom])
+		.attr("width", width)
+		.attr("height", height)
+	 .append("g")
+		.attr("transform", `translate(${margin.left},${margin.top})`);
+
+	// 6) scales
+	const x = d3.scalePoint()
+		.domain(dimensionsChart3)
+		.range([0, width]);
+
+	const y = {};
+	dimensionsChart3.forEach(dim => {
+		y[dim] = d3.scaleLinear()
+			.domain(chart3Domain[dim])
+			.range([height, 0]);
+	});
+
+	// 7) line‐generator
+	function path(d) {
+		return d3.line()(dimensionsChart3.map(dim => [ x(dim), y[dim](d[dim]) ]));
+	}
+
+
+	// 9) colored foreground lines
+	g.append("g").attr("class", "foreground")
+		.selectAll("path")
+		.data(data, d => d.color)
+		.enter().append("path")
+			.attr("class", "pc-line")
+			.attr("d", path)
+			.attr("stroke-width", 1.5)
+			.attr("stroke-opacity", 0.7)
+			.attr("fill", "none")
+			.attr("stroke", d => d.color);
+
+	// 10) axes
+	const axisG = g.selectAll(".dimension")
+		.data(dimensionsChart3)
+		.enter().append("g")
+			.attr("class", "dimension")
+			.attr("transform", d => `translate(${x(d)})`);
+
+	axisG.append("g")
+			.attr("class", "axis")
+			.each(function(d) { d3.select(this).call(d3.axisLeft(y[d])); })
+		.append("text")
+			.style("text-anchor", "middle")
+			.attr("y", -9)
+			.text(d => d);
+
+	// 11) stash for updates
+	initChart3.g	= g;
+	initChart3.x	= x;
+	initChart3.y	= y;
 }
 
+// Update legend + lines
 function updateChart3() {
-	chart3Data.forEach(elem => {
-		let _data = chart3FullData.filter(ele => ele.owner === elem.owner && +ele.date_of_launch <= (elem.year + minYear));
-		dimensionsChart3.forEach(dim => {
-			elem[dim] = d3.mean(_data, d => +d[dim]);
-		});
+	// 1) Build an array of all records to plot:
+	//		for each selected owner‐year, grab every record ≤ that year
+	const plotData = chart3Data.flatMap(elem => {
+		const cutoff = elem.year + minYear;
+		return chart3FullData
+			.filter(d => d.owner === elem.owner && +d.date_of_launch <= cutoff)
+			.map(d => ({
+				...d,
+				color: elem.color
+			}));
 	});
+
+	// 2) Legend enter/update/exit (unchanged)
 	let legendItem = chart3Legend.selectAll(".legend-item")
 		.data(chart3Data, d => d.color);
-	
+
 	legendItem.exit().remove();
-	legendItem = legendItem.enter()
+
+	const legendEnter = legendItem.enter()
 		.append("div")
-		.attr("class", "legend-item")
-		.style("display", "flex")
-		.style("align-items", "center")
-		.style("gap", "20px")
-		.style("height", "22px");
-	legendItem.append("button").attr("class", "close").text("X").on("click", handleRemovalChart3)
-	legendItem.append("div")
-		.style("background-color", d => d.color)
-		.attr("class","color-circle");
-	legendItem.append("p").text(d => `${d.owner} up to year: ${d.year + minYear}`);
-	
-	 const radarData = chart3Data.map(d => [ d, d.color ]);
+			.attr("class", "legend-item")
+			.style("display", "flex")
+			.style("align-items", "center")
+			.style("gap", "20px")
+			.style("height", "22px");
 
-	// 2) bind each owner‐year to a <g class="radar-item">
-	let radarItem = chart3.selectAll(".radar-item")
-		.data(radarData, d => d[1]);
+	legendEnter.append("button")
+			.attr("class", "close")
+			.text("X")
+			.on("click", handleRemovalChart3);
 
-	// exit
-	radarItem.exit().remove();
+	legendEnter.append("div")
+			.style("background-color", d => d.color)
+			.attr("class", "color-circle");
 
-	// enter
-	radarItem = radarItem.enter()
-		.append("g")
-			.attr("class", "radar-item");
+	legendEnter.append("p")
+			.text(d => `${d.owner} up to year: ${d.year + minYear}. number of sattelites: ${chart1Data[d.year].get(d.owner)}`);
 
-	// append the polyline once per new <g>
-	radarItem.append("polyline")
-		.attr("class", "radar-line")
-		.attr("fill", "none")
-		.attr("stroke-width", 3)
-		.attr("fill-opacity", 0);
+	// 3) Rebind lines to plotData
+	const g		= initChart3.g;
+	const x		= initChart3.x;
+	const y		= initChart3.y;
+	const dims = dimensionsChart3;
+	const line = d3.line();
 
-	// append one circle per dimension inside each <g>
-	dimensionsChart3.forEach((val, index) => {
-		radarItem.append("circle")
-			.attr("class", "radar-circle")
-			.attr("r", 5);
-	});
+	const fg = g.select("g.foreground")
+		.selectAll("path.pc-line")
+		.data(plotData, d => `${d.owner}~${d.date_of_launch}~${d.color}`);
 
-	// merge enter + update
-	radarItem = radarItem.merge(chart3.selectAll(".radar-item"));
+	// remove old
+	fg.exit().remove();
 
-	// radius used in initChart3
-	const radius = 250;
-
-	// per‐dimension linear scales
-	const axisScales = {};
-	dimensionsChart3.forEach(dim => {
-		axisScales[dim] = d3.scaleLinear()
-			.domain([ chart3Domain[dim][0], chart3Domain[dim][1] ])
-			.range([ 0, radius ]);
-	});
-
-	// update polyline “points” for each group
-	radarItem.select("polyline")
-		.attr("stroke", d => d[1])
-		.attr("points", d => {
-			// compute one [x,y] per dimension, then close the loop
-			const pts = dimensionsChart3.map((dim, i) => {
-				const r = axisScales[dim](d[0][dim]) * 0.75;
-				return [ chart3X(r, i), chart3Y(r, i) ];
-			});
-			pts.push(pts[0]);
-			return pts.map(p => p.join(",")).join(" ");
-		});
-
-	// update each circle’s position & color
-	radarItem.selectAll("circle")
-		.data(d => dimensionsChart3.map((dim, i) => ({
-			dim,
-			value: d[0][dim],
-			color: d[1],
-			angleIndex: i
-		})))
-		.attr("cx", d => {
-			const r = axisScales[d.dim](d.value) * 0.75;
-			return chart3X(r, d.angleIndex);
-		})
-		.attr("cy", d => {
-			const r = axisScales[d.dim](d.value) * 0.75;
-			return chart3Y(r, d.angleIndex);
-		})
-		.attr("fill", d => d.color);
-
-
+	// add new + update all
+	fg.enter().append("path")
+			.attr("class", "pc-line")
+			.attr("fill", "none")
+			.attr("stroke-width", 1.5)
+			.attr("stroke-opacity", 0.7)
+		.merge(fg)
+			.attr("stroke", d => d.color)
+			.attr("d", d => line(
+				dims.map(dim => [ x(dim), y[dim](+d[dim]) ])
+			));
 }
 
 function handleRemovalChart3(e, d) {
 	chart3Data = chart3Data.filter(ele => ele.color !== d.color);
 	colorsChart3.push(d.color);
 	updateChart3();
-}
-
-function chart3X(radius, index){
-	return radius * Math.cos(chart3Angle(index));
-}
-
-function chart3Y(radius, index){
-	return radius * Math.sin(chart3Angle(index));
-}
-
-function chart3Angle(index){
-	return chart3AxesAngle * index - Math.PI / 2;
 }

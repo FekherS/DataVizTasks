@@ -3,7 +3,12 @@ function createChart4(_data) {
 	chart4 = d3.select("#chart4");
 	initChart4(_data);
 }
-
+const colorScales = [
+    d3.scaleOrdinal(d3.schemeCategory10), // depth 1
+    d3.scaleOrdinal(d3.schemeAccent),     // depth 2
+    d3.scaleOrdinal(d3.schemeSet3),       // depth 3
+    d3.scaleOrdinal(d3.schemePastel1)     // depth 4+
+];
 function initChart4(_data) {
 	const data = {
 		name: "satellites",
@@ -49,8 +54,8 @@ function initChart4(_data) {
 }
 
 function makeChart4(data) {
-	const width = 900;
-	const height = 900;
+	const width = 600;
+	const height = 600;
 	const radius = width / 6;
 
 	const color = d3.scaleOrdinal(d3.quantize(d3.interpolateRainbow, data.children.length + 1));
@@ -83,8 +88,12 @@ function makeChart4(data) {
 		.selectAll("path")
 		.data(root.descendants().slice(1))
 		.join("path")
-			.attr("fill", d => { while (d.depth > 1) d = d.parent; return color(d.data.name); })
-			.attr("fill-opacity", d => arcVisible(d.current) ? (d.children ? 0.6 : 0.4) : 0)
+		.attr("fill", d => {
+			const depth = d.depth - 1; // since root is depth 0
+			const scale = colorScales[Math.min(depth, colorScales.length - 1)];
+			return scale(d.data.name);
+		})
+		.attr("fill-opacity", d => arcVisible(d.current) ? (d.children ? 0.6 : 0.4) : 0)
 			.attr("pointer-events", d => arcVisible(d.current) ? "auto" : "none")
 			.attr("d", d => arc(d.current));
 
